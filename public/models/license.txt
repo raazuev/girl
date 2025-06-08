@@ -1,0 +1,11 @@
+Model Information:
+* title:	HIT2 Female swordsman
+* source:	https://sketchfab.com/3d-models/hit2-female-swordsman-bfc0c40414ce4e37bea0567ce4a36792
+* author:	enzohao (https://sketchfab.com/enzohao)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "HIT2 Female swordsman" (https://sketchfab.com/3d-models/hit2-female-swordsman-bfc0c40414ce4e37bea0567ce4a36792) by enzohao (https://sketchfab.com/enzohao) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
