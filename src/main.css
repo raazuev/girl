@@ -2,3 +2,13 @@
   margin: 0;
   padding: 0;
 }
+
+#app {
+  display: none;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background-color: #fff;
+  padding: 10px;
+  border-radius: 5px;
+}
