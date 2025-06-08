@@ -133,8 +133,8 @@ const shaderMaterial = new THREE.ShaderMaterial({
 });
 
 // куб для шейдера
-const newCube = new THREE.Mesh(new THREE.BoxGeometry(), shaderMaterial);
-scene.add(newCube);
+const newSphere = new THREE.Mesh(new THREE.SphereGeometry(), shaderMaterial);
+scene.add(newSphere);
 
 // загрузка 3D
 const loader = new GLTFLoader();
