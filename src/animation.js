@@ -1,10 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 
-// Основная сцена
+// 1) Сцена, камера, рендер и свет
 const scene = new THREE.Scene();
-
-// Основная камера
 const camera = new THREE.PerspectiveCamera(
   40,
   window.innerWidth / window.innerHeight,
@@ -14,78 +13,90 @@ const camera = new THREE.PerspectiveCamera(
 camera.position.set(1, 2, 10);
 camera.rotation.x = 6;
 
-// Основной рендер
-const renderer = new THREE.WebGLRenderer();
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
-
 document.body.appendChild(renderer.domElement);
 
-// Общий свет для любого объекта
-const ambientLight = new THREE.AmbientLight("#fff", 1.4);
-scene.add(ambientLight);
-
-// Свет по типу солнца
+// Освещение
+scene.add(new THREE.AmbientLight("#fff", 1.4));
 const dirLight = new THREE.DirectionalLight("#fff", 1);
 dirLight.position.set(5, 5, 5);
 dirLight.castShadow = true;
 scene.add(dirLight);
 
-// плоскость
-const road = new THREE.Mesh(
-  new THREE.PlaneGeometry(25, 45),
-  new THREE.MeshStandardMaterial({ color: "#333" })
+// HDRI-фоновая карта
+new RGBELoader().load("/texture/golden_gate_hills_4k.hdr", (texture) => {
+  texture.mapping = THREE.EquirectangularReflectionMapping;
+  scene.background = texture;
+  scene.environment = texture;
+});
+
+// 2) Дорога с асфальтовой текстурой
+const texLoader = new THREE.TextureLoader();
+const asphaltColor = texLoader.load("/texture/Asphalt023S_1K-PNG_Color.png");
+const asphaltNormal = texLoader.load(
+  "/texture/Asphalt023S_1K-PNG_NormalGL.png"
 );
+const asphaltRoughness = texLoader.load(
+  "/texture/Asphalt023S_1K-PNG_Roughness.png"
+);
+
+[asphaltColor, asphaltNormal, asphaltRoughness].forEach((tex) => {
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // повторяем текстуру по X и Z
+  tex.repeat.set(10, 10);
+});
+
+const roadMaterial = new THREE.MeshStandardMaterial({
+  map: asphaltColor,
+  normalMap: asphaltNormal,
+  roughnessMap: asphaltRoughness,
+  metalness: 0.1,
+  roughness: 1.0,
+  envMap: scene.environment, // отражения HDRI
+  envMapIntensity: 0.5,
+});
+
+const road = new THREE.Mesh(new THREE.PlaneGeometry(25, 45), roadMaterial);
 road.rotation.x = -Math.PI / 2;
 scene.add(road);
 
-// загрузка машины 3D
-const loader = new GLTFLoader();
-let car;
-
-loader.load(
+// 3) Загрузка машины
+let car = null;
+new GLTFLoader().load(
   "/porsche/scene.gltf",
   (gltf) => {
-    car = gltf.scene; // загрузка объекта
+    car = gltf.scene;
     car.scale.set(0.5, 0.5, 0.5);
     car.position.set(0, 1, 0);
     scene.add(car);
   },
-  (onProgress) => {
-    console.log((onProgress.loaded / onProgress.total) * 100 + "% loaded"); // процент загрузки объекта
-  },
-  (onError) => {
-    console.error("Error: " + onError);
-  }
+  (xhr) =>
+    console.log(((xhr.loaded / xhr.total) * 100).toFixed(1) + "% loaded"),
+  (err) => console.error(err)
 );
 
-// функция для движения машинки
-let angle = 0;
-let isMoving = false;
-
-// обработчики нажатий
+// 4) Управление (стрелки)
+const controlsState = {
+  moveF: false,
+  moveB: false,
+  turnL: false,
+  turnR: false,
+};
 window.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") {
-    isMoving = true;
-  }
+  if (e.key === "ArrowUp") controlsState.moveF = true;
+  if (e.key === "ArrowDown") controlsState.moveB = true;
+  if (e.key === "ArrowLeft") controlsState.turnL = true;
+  if (e.key === "ArrowRight") controlsState.turnR = true;
 });
-
 window.addEventListener("keyup", (e) => {
-  if (e.key === "ArrowUp") {
-    isMoving = false;
-  }
+  if (e.key === "ArrowUp") controlsState.moveF = false;
+  if (e.key === "ArrowDown") controlsState.moveB = false;
+  if (e.key === "ArrowLeft") controlsState.turnL = false;
+  if (e.key === "ArrowRight") controlsState.turnR = false;
 });
 
-// функция для машины
-function moveCar() {
-  if (!car || !isMoving) return;
-
-  angle += 0.01;
-  car.position.x = 5 * Math.cos(angle);
-  car.position.z = 5 * Math.sin(angle);
-  car.rotation.y = -angle;
-}
-
-// точки для плоскости
+// 5) Точки интереса
 const infoPoints = [
   {
     position: new THREE.Vector3(5, 0, 0),
@@ -99,90 +110,66 @@ const infoPoints = [
   },
   {
     position: new THREE.Vector3(0, 0, 0),
-    message: "Тревья точка",
+    message: "Третья точка",
     sphere: null,
   },
 ];
-
-// проверка нахождения машины на точках
-function checkInfoPoints() {
-  infoPoints.forEach((point) => {
-    const distance = car.position.distanceTo(point.position);
-    if (distance < 0.5) {
-      showInfo(point.message);
-    }
-  });
-}
-
-// для показа точек
-function showInfo(message) {
-  const infoBox = document.getElementById("app");
-  infoBox.innerText = message;
-  infoBox.style.display = "block";
-}
-
-// показ точек на плоскости
-// infoPoints.forEach((point) => {
-//   createInfoSphere(point.position);
-// });
-infoPoints.forEach((point) => {
-  const geo = new THREE.SphereGeometry(0.2, 32, 32);
-  const mat = new THREE.MeshStandardMaterial({ color: "blue" });
-  const sph = new THREE.Mesh(geo, mat);
-
-  sph.position.copy(point.position);
-  sph.position.y = 0.5;
-  sph.scale.set(1, 1, 1); // стартовый масштаб
+infoPoints.forEach((pt) => {
+  const sph = new THREE.Mesh(
+    new THREE.SphereGeometry(0.2, 32, 32),
+    new THREE.MeshStandardMaterial({ color: "blue" })
+  );
+  sph.position.copy(pt.position).setY(0.5);
   scene.add(sph);
-
-  point.sphere = sph;
+  pt.sphere = sph;
 });
 
-// точки
-// function createInfoSphere(position) {
-//   const sphere = new THREE.Mesh(
-//     new THREE.SphereGeometry(0.2, 32, 32),
-//     new THREE.MeshStandardMaterial({ color: "blue" })
-//   );
-//   sphere.position.copy(position);
-//   sphere.position.y = 0.5;
-//   scene.add(sphere);
-// }
+// 6) Обновление машины
+function updateCar(delta) {
+  if (!car) return;
+  const turnSpeed = 1.5,
+    moveSpeed = 5;
+  if (controlsState.turnL) car.rotation.y += turnSpeed * delta;
+  if (controlsState.turnR) car.rotation.y -= turnSpeed * delta;
 
-// Функция проверки и анимации сфер
+  const forward = new THREE.Vector3(0, 0, -1)
+    .applyQuaternion(car.quaternion)
+    .normalize();
+
+  if (controlsState.moveF)
+    car.position.add(forward.multiplyScalar(moveSpeed * delta));
+  if (controlsState.moveB)
+    car.position.add(forward.multiplyScalar(-moveSpeed * delta));
+}
+
+// 7) Анимация точек
 function updateInfoSpheres() {
   if (!car) return;
-
-  infoPoints.forEach((point) => {
-    const sph = point.sphere;
-    const dist = car.position.distanceTo(point.position);
-
-    // если машина ближе 1.5 ед., увеличиваем; иначе — уменьшаем
-    const targetScale = dist < 1.5 ? 1.8 : 1.0;
-
-    // плавная интерполяция: new = old + (target - old) * alpha
-    const alpha = 0.1;
-    sph.scale.x += (targetScale - sph.scale.x) * alpha;
-    sph.scale.y += (targetScale - sph.scale.y) * alpha;
-    sph.scale.z += (targetScale - sph.scale.z) * alpha;
-
-    // показываем инфо-бокс, когда близко
-    if (dist < 1.5) {
-      document.getElementById("app").innerText = point.message;
-      document.getElementById("app").style.display = "block";
+  const threshold = 1.5,
+    alpha = 0.1;
+  infoPoints.forEach((pt) => {
+    const dist = car.position.distanceTo(pt.position);
+    const target = dist < threshold ? 1.8 : 1.0;
+    pt.sphere.scale.lerp(new THREE.Vector3(target, target, target), alpha);
+    if (dist < threshold) {
+      const box = document.getElementById("app");
+      box.innerText = pt.message;
+      box.style.display = "block";
     }
   });
 }
 
-// Функция постоянного рендера анимации
+// 8) Цикл рендера
+let prevTime = performance.now();
 function animate() {
   requestAnimationFrame(animate);
-  moveCar();
-  // checkInfoPoints();
+  const now = performance.now();
+  const delta = (now - prevTime) / 1000;
+  prevTime = now;
+
+  updateCar(delta);
   updateInfoSpheres();
 
-  renderer.setClearColor("lightblue");
   renderer.render(scene, camera);
 }
-
 animate();
